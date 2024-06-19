@@ -32,7 +32,8 @@ jobs:
       - name: Get Slave IP
         id: get_ip
         run: |
-          echo "SLAVE_IP=$(hostname -I | awk '{print $1}')" >> $GITHUB_ENV
+          SLAVE_IP=$(curl -s https://api.ipify.org)  # Retrieve IP address using ipify.org
+          echo "::set-output name=SLAVE_IP::$SLAVE_IP"
 
   start-slave:
     runs-on: ubuntu-latest
@@ -72,10 +73,10 @@ jobs:
 
       - name: Modify jmeter-server Script
         run: |
-          SLAVE_IP=$(hostname -I | awk '{print $1}')
+          SLAVE_IP=${{ needs.setup-and-test.outputs.SLAVE_IP }}
           echo "Using SLAVE_IP: $SLAVE_IP"
           sed -i 's/^#RUN_IN_BACKGROUND/RUN_IN_BACKGROUND/' $JMETER_HOME/bin/jmeter-server
-          sed -i 's/^#START/RUN_IN_BACKGROUND/' $JMETER_HOME/bin/jmeter-server
+          sed -i 's/^#START/START/' $JMETER_HOME/bin/jmeter-server  # Corrected sed command
           echo "RMI_PORT=1099" >> $JMETER_HOME/bin/jmeter-server
           echo "RMI_HOST_DEF=-Djava.rmi.server.hostname=$SLAVE_IP" >> $JMETER_HOME/bin/jmeter-server
           echo 'JVM_ARGS="-Dserver.rmi.port=1099 -Dserver.rmi.localport=50000 -Dclient.rmi.localport=50000 -Dserver.rmi.ssl.disable=true $RMI_HOST_DEF"' >> $JMETER_HOME/bin/jmeter-server
@@ -129,28 +130,20 @@ jobs:
       - name: Configure JMeter Master
         run: |
           echo "Configuring JMeter Master"
-          echo "remote_hosts=${{ env.SLAVE_IP }}:1099" >> $JMETER_HOME/bin/user.properties
+          echo "remote_hosts=${{ needs.setup-and-test.outputs.SLAVE_IP }}:1099" >> $JMETER_HOME/bin/user.properties
           echo "server.rmi.ssl.disable=true" >> $JMETER_HOME/bin/user.properties
         shell: bash
 
       - name: Test Connection to JMeter Slave
         run: |
+          SLAVE_IP=${{ needs.setup-and-test.outputs.SLAVE_IP }}
           echo "Testing connection to JMeter Slave at $SLAVE_IP"
           nc -zv $SLAVE_IP 1099 || (echo "Unable to connect to JMeter Slave on port 1099" && exit 1)
         shell: bash
-        env:
-          JAVA_HOME: ${{ env.JAVA_HOME }}
-          JMETER_HOME: ${{ env.JMETER_HOME }}
-          SLAVE_IP: ${{ needs.start-slave.outputs.SLAVE_IP }}
-        timeout-minutes: 5
 
       - name: Run JMeter Test (Master)
         run: |
           echo "Running JMeter Test"
-          $JMETER_HOME/bin/jmeter -n -t Demo.jmx -R${{ env.SLAVE_IP }}:1099 -l test-results.jtl
+          $JMETER_HOME/bin/jmeter -n -t Demo.jmx -R${{ needs.setup-and-test.outputs.SLAVE_IP }}:1099 -l test-results.jtl
           cat test-results.jtl
         shell: bash
-        env:
-          JAVA_HOME: ${{ env.JAVA_HOME }}
-          JMETER_HOME: ${{ env.JMETER_HOME }}
-          SLAVE_IP: ${{ needs.start-slave.outputs.SLAVE_IP }}
