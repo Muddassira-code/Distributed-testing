@@ -54,14 +54,6 @@ jobs:
           echo "$JMETER_HOME/bin" >> $GITHUB_PATH
         shell: bash
 
-      - name: Terminate Orphan Processes
-        run: |
-          echo "Terminating orphan processes"
-          pkill -f jmeter-server || echo "No orphan jmeter-server processes found"
-          pkill -f jmeter || echo "No orphan jmeter processes found"
-          pkill -f java || echo "No orphan java processes found"
-        shell: bash
-
       - name: Configure JMeter Slave Properties
         run: |
           echo "server.rmi.ssl.disable=true" >> $JMETER_HOME/bin/user.properties
