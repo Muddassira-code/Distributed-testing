@@ -74,9 +74,15 @@ jobs:
           echo "server.rmi.localport=50000" >> $JMETER_HOME/bin/user.properties
         shell: bash
 
+      - name: Modify jmeter-server Script
+        run: |
+          sed -i 's/^#RUN_IN_BACKGROUND/RUN_IN_BACKGROUND/' $JMETER_HOME/bin/jmeter-server
+          sed -i 's/^#START/RUN_IN_BACKGROUND/' $JMETER_HOME/bin/jmeter-server
+          echo 'RMI_PORT=1100' >> $JMETER_HOME/bin/jmeter-server
+          echo 'JVM_ARGS="-Dserver.rmi.port=1100 -Dserver.rmi.localport=50000 -Dclient.rmi.localport=50000 -Dserver.rmi.ssl.disable=true"' >> $JMETER_HOME/bin/jmeter-server
+        shell: bash
+
       - name: Start JMeter Server (Slave)
-        env:
-          JVM_ARGS: "-Dserver.rmi.port=1100 -Dserver.rmi.localport=50000 -Dclient.rmi.localport=50000 -Dserver.rmi.ssl.disable=true"
         run: |
           echo "Starting JMeter in server mode"
           nohup $JMETER_HOME/bin/jmeter-server > jmeter-server.log 2>&1 &
