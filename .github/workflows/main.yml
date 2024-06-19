@@ -110,6 +110,8 @@ jobs:
   run-master:
     runs-on: ubuntu-latest
     needs: start-slave
+    env:
+      SLAVE_IP: ${{ needs.start-slave.outputs.slave_ip }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -140,19 +142,15 @@ jobs:
         shell: bash
 
       - name: Configure JMeter Master
-        env:
-          SLAVE_IP: ${{ needs.start-slave.outputs.slave_ip }}
         run: |
           echo "Configuring JMeter Master"
-          echo "remote_hosts=${SLAVE_IP}:1099" >> $JMETER_HOME/bin/user.properties
+          echo "remote_hosts=${{ env.SLAVE_IP }}:1099" >> $JMETER_HOME/bin/user.properties
           echo "server.rmi.ssl.disable=true" >> $JMETER_HOME/bin/user.properties
         shell: bash
 
       - name: Run JMeter Test (Master)
-        env:
-          SLAVE_IP: ${{ needs.start-slave.outputs.slave_ip }}
         run: |
           echo "Running JMeter Test"
-          $JMETER_HOME/bin/jmeter -n -t Demo.jmx -R${SLAVE_IP}:1099 -l test-results.jtl
+          $JMETER_HOME/bin/jmeter -n -t Demo.jmx -R${{ env.SLAVE_IP }}:1099 -l test-results.jtl
           cat test-results.jtl
         shell: bash
