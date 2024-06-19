@@ -78,6 +78,7 @@ jobs:
       - name: Modify jmeter-server Script
         run: |
           SLAVE_IP=$(hostname -I | awk '{print $1}')
+          echo "Using SLAVE_IP: $SLAVE_IP"
           sed -i 's/^#RUN_IN_BACKGROUND/RUN_IN_BACKGROUND/' $JMETER_HOME/bin/jmeter-server
           sed -i 's/^#START/RUN_IN_BACKGROUND/' $JMETER_HOME/bin/jmeter-server
           echo "RMI_PORT=1099" >> $JMETER_HOME/bin/jmeter-server
@@ -112,6 +113,9 @@ jobs:
     needs: start-slave
     env:
       SLAVE_IP: ${{ needs.start-slave.outputs.slave_ip }}
+      JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/11.0.23-9/x64
+      JAVA_HOME_11_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/11.0.23-9/x64
+      JMETER_HOME: /home/runner/work/Distributed-testing/Distributed-testing/apache-jmeter-5.5
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -146,6 +150,12 @@ jobs:
           echo "Configuring JMeter Master"
           echo "remote_hosts=${{ env.SLAVE_IP }}:1099" >> $JMETER_HOME/bin/user.properties
           echo "server.rmi.ssl.disable=true" >> $JMETER_HOME/bin/user.properties
+        shell: bash
+
+      - name: Test Connection to JMeter Slave
+        run: |
+          echo "Testing connection to JMeter Slave"
+          nc -zv ${{ env.SLAVE_IP }} 1099 || (echo "Unable to connect to JMeter Slave on port 1099" && exit 1)
         shell: bash
 
       - name: Run JMeter Test (Master)
