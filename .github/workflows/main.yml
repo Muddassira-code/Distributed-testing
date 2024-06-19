@@ -72,6 +72,7 @@ jobs:
           echo "server.rmi.port=1099" >> $JMETER_HOME/bin/user.properties
           echo "client.rmi.localport=50000" >> $JMETER_HOME/bin/user.properties
           echo "server.rmi.localport=50000" >> $JMETER_HOME/bin/user.properties
+          echo "server.rmi.ssl.disable=true" >> $JMETER_HOME/bin/system.properties
         shell: bash
 
       - name: Modify jmeter-server Script
@@ -144,6 +145,7 @@ jobs:
         run: |
           echo "Configuring JMeter Master"
           echo "remote_hosts=${SLAVE_IP}:1099" >> $JMETER_HOME/bin/user.properties
+          echo "server.rmi.ssl.disable=true" >> $JMETER_HOME/bin/user.properties
         shell: bash
 
       - name: Run JMeter Test (Master)
