@@ -1,0 +1,146 @@
+name: Distributed Load Testing with JMeter
+
+on: [push]
+
+jobs:
+  setup-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        role: [master, slave]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Download and Extract JMeter
+        run: |
+          wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.5.tgz -O jmeter.tgz
+          tar -xzf jmeter.tgz
+        shell: bash
+
+      - name: Set JMeter Home and Path
+        run: |
+          export JMETER_HOME=$(pwd)/apache-jmeter-5.5
+          echo "JMETER_HOME=$JMETER_HOME" >> $GITHUB_ENV
+          echo "$JMETER_HOME/bin" >> $GITHUB_PATH
+        shell: bash
+
+  start-slave:
+    runs-on: ubuntu-latest
+    needs: setup-and-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Download and Extract JMeter
+        run: |
+          wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.5.tgz -O jmeter.tgz
+          tar -xzf jmeter.tgz
+        shell: bash
+
+      - name: Set JMeter Home and Path
+        run: |
+          export JMETER_HOME=$(pwd)/apache-jmeter-5.5
+          echo "JMETER_HOME=$JMETER_HOME" >> $GITHUB_ENV
+          echo "$JMETER_HOME/bin" >> $GITHUB_PATH
+        shell: bash
+
+      - name: Terminate Orphan Processes
+        run: |
+          echo "Terminating orphan processes"
+          pkill -f jmeter-server || echo "No orphan jmeter-server processes found"
+          pkill -f jmeter || echo "No orphan jmeter processes found"
+          pkill -f java || echo "No orphan java processes found"
+        shell: bash
+
+      - name: Configure JMeter Slave Properties
+        run: |
+          echo "server.rmi.ssl.disable=true" >> $JMETER_HOME/bin/user.properties
+          echo "server.rmi.port=1100" >> $JMETER_HOME/bin/user.properties
+          echo "client.rmi.localport=50000" >> $JMETER_HOME/bin/user.properties
+          echo "server.rmi.localport=50000" >> $JMETER_HOME/bin/user.properties
+        shell: bash
+
+      - name: Start JMeter Server (Slave)
+        run: |
+          echo "Starting JMeter in server mode"
+          nohup $JMETER_HOME/bin/jmeter-server > jmeter-server.log 2>&1 &
+          sleep 10
+          echo "JMeter Server Log:"
+          cat jmeter-server.log
+          echo "Checking if JMeter Slave is running"
+          pgrep -f jmeter-server || (echo "JMeter Slave failed to start" && cat jmeter-server.log && exit 1)
+          echo "JMeter Slave started successfully"
+        shell: bash
+
+      - name: Check if JMeter Slave is Listening on Port 1100
+        run: |
+          echo "Checking if JMeter Slave is listening on port 1100"
+          netstat -an | grep 1100 || (echo "JMeter Slave is not listening on port 1100" && cat jmeter-server.log && exit 1)
+        shell: bash
+
+      - name: Get Slave IP
+        id: get_ip
+        run: echo "::set-output name=slave_ip::$(hostname -I | awk '{print $1}')"
+
+  run-master:
+    runs-on: ubuntu-latest
+    needs: start-slave
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Download and Extract JMeter
+        run: |
+          wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.5.tgz -O jmeter.tgz
+          tar -xzf jmeter.tgz
+        shell: bash
+
+      - name: Set JMeter Home and Path
+        run: |
+          export JMETER_HOME=$(pwd)/apache-jmeter-5.5
+          echo "JMETER_HOME=$JMETER_HOME" >> $GITHUB_ENV
+          echo "$JMETER_HOME/bin" >> $GITHUB_PATH
+        shell: bash
+
+      - name: Wait for Slave to Start
+        run: |
+          echo "Waiting for JMeter Slave to start"
+          sleep 60
+        shell: bash
+
+      - name: Configure JMeter Master
+        env:
+          SLAVE_IP: ${{ needs.start-slave.outputs.slave_ip }}
+        run: |
+          echo "Configuring JMeter Master"
+          echo "remote_hosts=${SLAVE_IP}:1100" >> $JMETER_HOME/bin/user.properties
+        shell: bash
+
+      - name: Run JMeter Test (Master)
+        env:
+          SLAVE_IP: ${{ needs.start-slave.outputs.slave_ip }}
+        run: |
+          echo "Running JMeter Test"
+          $JMETER_HOME/bin/jmeter -n -t Demo.jmx -R${SLAVE_IP}:1100 -l test-results.jtl
+          cat test-results.jtl
+        shell: bash
