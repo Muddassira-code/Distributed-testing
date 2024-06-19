@@ -133,6 +133,10 @@ jobs:
           echo "server.rmi.ssl.disable=true" >> $JMETER_HOME/bin/user.properties
         shell: bash
 
+      - name: Get Slave IP
+        id: get_ip
+        run: echo "::set-output name=slave_ip::$(hostname -I | awk '{print $1}')"
+
       - name: Test Connection to JMeter Slave
         run: |
           SLAVE_IP=${{ needs.start-slave.outputs.slave_ip }}
