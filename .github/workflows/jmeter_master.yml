@@ -15,21 +15,28 @@ jobs:
       jmeter-slave:
         image: justb4/jmeter:5.4.1
         ports:
-          - 1099/tcp
-          - 60000/tcp
+          - 1099:1099
+          - 60000:60000
         options: --name jmeter-slave
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
 
+    - name: Set up JDK
+      uses: actions/setup-java@v2
+      with:
+        java-version: '11'
+
+    - name: Install Docker Compose
+      run: sudo apt-get install -y docker-compose
+
     - name: Configure and run JMeter test
       run: |
-        echo "${{ github.event.inputs.slave_ip }}" > $GITHUB_WORKSPACE/slaves.txt
         docker run \
           --network="host" \
           -v $GITHUB_WORKSPACE:/workspace \
           justb4/jmeter:5.4.1 \
-          -n -t /workspace/your_test_plan.jmx -R${{ github.event.inputs.slave_ip }}
+          -n -t /workspace/Demo.jmx -R${{ github.event.inputs.slave_ip }}
 
     - name: Upload JTL file
       if: always()
