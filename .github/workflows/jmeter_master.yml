@@ -1,0 +1,43 @@
+name: JMeter Master
+
+on:
+  workflow_dispatch:
+    inputs:
+      slave_ip:
+        description: 'IP address of the JMeter slave'
+        required: true
+        type: string
+
+jobs:
+  jmeter-master:
+    runs-on: ubuntu-latest
+    services:
+      jmeter-slave:
+        image: justb4/jmeter:5.4.1
+        ports:
+          - 1099/tcp
+          - 60000/tcp
+        options: --name jmeter-slave
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Configure and run JMeter test
+      run: |
+        echo "${{ github.event.inputs.slave_ip }}" > $GITHUB_WORKSPACE/slaves.txt
+        docker run \
+          --network="host" \
+          -v $GITHUB_WORKSPACE:/workspace \
+          justb4/jmeter:5.4.1 \
+          -n -t /workspace/your_test_plan.jmx -R${{ github.event.inputs.slave_ip }}
+
+    - name: Upload JTL file
+      if: always()
+      uses: actions/upload-artifact@v2
+      with:
+        name: jmeter-results
+        path: $GITHUB_WORKSPACE/*.jtl
+
+    - name: Post-test cleanup
+      run: |
+        echo "Test completed. Cleaning up..."
