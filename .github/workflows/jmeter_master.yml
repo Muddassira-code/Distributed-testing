@@ -2,48 +2,27 @@ name: JMeter Master
 
 on:
   workflow_dispatch:
-    inputs:
-      slave_ip:
-        description: 'IP address of the JMeter slave'
-        required: true
-        type: string
 
 jobs:
   jmeter-master:
     runs-on: ubuntu-latest
-    services:
-      jmeter-slave:
-        image: justb4/jmeter:5.4.1
-        ports:
-          - 1099:1099
-          - 60000:60000
-        options: --name jmeter-slave
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Set up JDK
-      uses: actions/setup-java@v2
-      with:
-        java-version: '11'
-
-    - name: Install Docker Compose
-      run: sudo apt-get install -y docker-compose
+    - name: Set up JMeter
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openjdk-11-jdk
+        wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.4.1.tgz
+        tar -xvzf apache-jmeter-5.4.1.tgz
+        export JMETER_HOME=$PWD/apache-jmeter-5.4.1
+        export PATH=$JMETER_HOME/bin:$PATH
 
     - name: Configure and run JMeter test
       run: |
-        docker run \
-          --network="host" \
-          -v $GITHUB_WORKSPACE:/workspace \
-          justb4/jmeter:5.4.1 \
-          -n -t /workspace/Demo.jmx -R${{ github.event.inputs.slave_ip }}
-
-    - name: Upload JTL file
-      if: always()
-      uses: actions/upload-artifact@v2
-      with:
-        name: jmeter-results
-        path: $GITHUB_WORKSPACE/*.jtl
+        echo "slave_ip=$(aws ec2 describe-instances --instance-ids <INSTANCE_ID> --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)" >> $GITHUB_ENV
+        jmeter -n -t your_test_plan.jmx -R ${{ env.slave_ip }}
 
     - name: Post-test cleanup
       run: |
