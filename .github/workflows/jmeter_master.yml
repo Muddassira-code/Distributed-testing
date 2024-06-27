@@ -13,11 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     services:
       jmeter-slave:
-        image: justb4/jmeter:5.4.1
+        image: justb4/jmeter
         ports:
           - 1099/tcp
           - 60000/tcp
         options: --name jmeter-slave
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -28,7 +29,7 @@ jobs:
         docker run \
           --network="host" \
           -v $GITHUB_WORKSPACE:/workspace \
-          justb4/jmeter:5.4.1 \
+          justb4/jmeter \
           -n -t /workspace/your_test_plan.jmx -R${{ github.event.inputs.slave_ip }}
 
     - name: Upload JTL file
