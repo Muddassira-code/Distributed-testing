@@ -26,12 +26,12 @@ jobs:
     - name: Configure and run JMeter test
       run: |
         echo "${{ github.event.inputs.slave_ip }}" > $GITHUB_WORKSPACE/slaves.txt
-        echo "server.rmi.ssl.disable=true" >> $GITHUB_WORKSPACE/user.properties
+        echo "server.rmi.ssl.disable=true" > $GITHUB_WORKSPACE/user.properties
         docker run \
           --network="host" \
           -v $GITHUB_WORKSPACE:/workspace \
           justb4/jmeter \
-          -n -t /workspace/Demo.jmx -R${{ github.event.inputs.slave_ip }} -Duser.properties=/workspace/user.properties
+          -n -t /workspace/your_test_plan.jmx -R${{ github.event.inputs.slave_ip }} -Duser.properties=/workspace/user.properties
 
     - name: Upload JTL file
       if: always()
