@@ -22,6 +22,8 @@ jobs:
       run: |
         docker run -d --name jmeter-slave \
           --network=jmeter-network \
+          -p 1099:1099 \
+          -p 60000:60000 \
           -e JVM_ARGS=-Dserver.rmi.ssl.disable=true \
           justb4/jmeter
 
@@ -46,6 +48,8 @@ jobs:
       run: |
         echo "${{ github.event.inputs.slave_ip }}" > $GITHUB_WORKSPACE/slaves.txt
         docker run --network=jmeter-network \
+          -p 1099:1099 \
+          -p 60000:60000 \
           -v $GITHUB_WORKSPACE:/workspace \
           justb4/jmeter \
           -n -t /workspace/Demo.jmx \
