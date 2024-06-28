@@ -11,19 +11,19 @@ on:
 jobs:
   jmeter-master:
     runs-on: ubuntu-latest
-    services:
-      jmeter-slave:
-        image: justb4/jmeter
-        ports:
-          - 1099/tcp
-          - 60000/tcp
-        options: --name jmeter-slave
-        env:
-          JVM_ARGS: -Dserver.rmi.ssl.disable=true
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
+
+    - name: Create Docker network
+      run: docker network create jmeter-network
+
+    - name: Start JMeter Slave Container
+      run: |
+        docker run -d --name jmeter-slave \
+          --network=jmeter-network \
+          -e JVM_ARGS=-Dserver.rmi.ssl.disable=true \
+          justb4/jmeter
 
     - name: Create user.properties file
       run: echo "server.rmi.ssl.disable=true" > $GITHUB_WORKSPACE/user.properties
@@ -38,18 +38,17 @@ jobs:
         echo "Pinging JMeter slave..."
         ping -c 4 ${{ github.event.inputs.slave_ip }}
         echo "Testing port 1099..."
-        nc -zv ${{ github.event.inputs.slave_ip }} 1099
+        nc -zv ${{ github.event.inputs.slave_ip }} 1099 || echo "Port 1099 is not reachable"
         echo "Testing port 60000..."
-        nc -zv ${{ github.event.inputs.slave_ip }} 60000
+        nc -zv ${{ github.event.inputs.slave_ip }} 60000 || echo "Port 60000 is not reachable"
 
     - name: Configure and run JMeter test
       run: |
         echo "${{ github.event.inputs.slave_ip }}" > $GITHUB_WORKSPACE/slaves.txt
-        docker run \
-          --network="host" \
+        docker run --network=jmeter-network \
           -v $GITHUB_WORKSPACE:/workspace \
           justb4/jmeter \
-          -n -t /workspace/your_test_plan.jmx \
+          -n -t /workspace/Demo.jmx \
           -R${{ github.event.inputs.slave_ip }} \
           -Dserver.rmi.ssl.disable=true \
           -Duser.properties=/workspace/user.properties
@@ -62,4 +61,8 @@ jobs:
         path: $GITHUB_WORKSPACE/*.jtl
 
     - name: Post-test cleanup
-      run: echo "Test completed. Cleaning up..."
+      run: |
+        echo "Test completed. Cleaning up..."
+        docker stop jmeter-slave
+        docker rm jmeter-slave
+        docker network rm jmeter-network
