@@ -2,6 +2,11 @@ name: JMeter Master
 
 on:
   workflow_dispatch:
+    inputs:
+      slave_ip:
+        description: 'IP address of the JMeter slave'
+        required: true
+        type: string
 
 jobs:
   jmeter-master:
@@ -21,16 +26,8 @@ jobs:
 
     - name: Configure and run JMeter test
       run: |
-        echo "Fetching slave IP address..."
-        SLAVE_IP=$(aws ec2 describe-instances --instance-ids <INSTANCE_ID> --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)
-        echo "slave_ip=$SLAVE_IP" >> $GITHUB_ENV
-        echo "Slave IP: $SLAVE_IP"
-
-        echo "Setting up JMeter properties..."
-        echo "remote_hosts=$SLAVE_IP" > $JMETER_HOME/bin/user.properties
-
-        echo "Running JMeter test..."
-        jmeter -n -t your_test_plan.jmx -R $SLAVE_IP
+        echo "${{ github.event.inputs.slave_ip }}" > $JMETER_HOME/bin/slaves.txt
+        jmeter -n -t your_test_plan.jmx -R${{ github.event.inputs.slave_ip }}
 
     - name: Post-test cleanup
       run: |
