@@ -2,11 +2,6 @@ name: JMeter Master
 
 on:
   workflow_dispatch:
-    inputs:
-      slave_ip:
-        description: 'IP address of the JMeter slave'
-        required: true
-        type: string
 
 jobs:
   jmeter-master:
@@ -15,58 +10,28 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Create Docker network
-      run: docker network create jmeter-network
-
-    - name: Start JMeter Slave Container
-      run: |
-        docker run -d --name jmeter-slave \
-          --network=jmeter-network \
-          -p 1099:1099 \
-          -p 60000:60000 \
-          -e JVM_ARGS=-Dserver.rmi.ssl.disable=true \
-          justb4/jmeter
-
-    - name: Create user.properties file
-      run: echo "server.rmi.ssl.disable=true" > $GITHUB_WORKSPACE/user.properties
-
-    - name: Verify user.properties content
-      run: cat $GITHUB_WORKSPACE/user.properties
-
-    - name: Test connectivity to JMeter slave
+    - name: Set up JMeter
       run: |
         sudo apt-get update
-        sudo apt-get install -y iputils-ping netcat
-        echo "Pinging JMeter slave..."
-        ping -c 4 ${{ github.event.inputs.slave_ip }}
-        echo "Testing port 1099..."
-        nc -zv ${{ github.event.inputs.slave_ip }} 1099 || echo "Port 1099 is not reachable"
-        echo "Testing port 60000..."
-        nc -zv ${{ github.event.inputs.slave_ip }} 60000 || echo "Port 60000 is not reachable"
+        sudo apt-get install -y openjdk-11-jdk
+        wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.4.1.tgz
+        tar -xvzf apache-jmeter-5.4.1.tgz
+        export JMETER_HOME=$PWD/apache-jmeter-5.4.1
+        export PATH=$JMETER_HOME/bin:$PATH
 
     - name: Configure and run JMeter test
       run: |
-        echo "${{ github.event.inputs.slave_ip }}" > $GITHUB_WORKSPACE/slaves.txt
-        docker run --network=jmeter-network \
-          -p 1099:1099 \
-          -p 60000:60000 \
-          -v $GITHUB_WORKSPACE:/workspace \
-          justb4/jmeter \
-          -n -t /workspace/Demo.jmx \
-          -R${{ github.event.inputs.slave_ip }} \
-          -Dserver.rmi.ssl.disable=true \
-          -Duser.properties=/workspace/user.properties
+        echo "Fetching slave IP address..."
+        SLAVE_IP=$(aws ec2 describe-instances --instance-ids <INSTANCE_ID> --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)
+        echo "slave_ip=$SLAVE_IP" >> $GITHUB_ENV
+        echo "Slave IP: $SLAVE_IP"
 
-    - name: Upload JTL file
-      if: always()
-      uses: actions/upload-artifact@v2
-      with:
-        name: jmeter-results
-        path: $GITHUB_WORKSPACE/*.jtl
+        echo "Setting up JMeter properties..."
+        echo "remote_hosts=$SLAVE_IP" > $JMETER_HOME/bin/user.properties
+
+        echo "Running JMeter test..."
+        jmeter -n -t your_test_plan.jmx -R $SLAVE_IP
 
     - name: Post-test cleanup
       run: |
         echo "Test completed. Cleaning up..."
-        docker stop jmeter-slave
-        docker rm jmeter-slave
-        docker network rm jmeter-network
