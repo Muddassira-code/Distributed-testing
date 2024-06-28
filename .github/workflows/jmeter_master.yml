@@ -18,6 +18,8 @@ jobs:
           - 1099/tcp
           - 60000/tcp
         options: --name jmeter-slave
+        env:
+          JVM_ARGS: -Dserver.rmi.ssl.disable=true
 
     steps:
     - name: Checkout repository
@@ -29,6 +31,17 @@ jobs:
     - name: Verify user.properties content
       run: cat $GITHUB_WORKSPACE/user.properties
 
+    - name: Test connectivity to JMeter slave
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y iputils-ping netcat
+        echo "Pinging JMeter slave..."
+        ping -c 4 ${{ github.event.inputs.slave_ip }}
+        echo "Testing port 1099..."
+        nc -zv ${{ github.event.inputs.slave_ip }} 1099
+        echo "Testing port 60000..."
+        nc -zv ${{ github.event.inputs.slave_ip }} 60000
+
     - name: Configure and run JMeter test
       run: |
         echo "${{ github.event.inputs.slave_ip }}" > $GITHUB_WORKSPACE/slaves.txt
@@ -36,7 +49,7 @@ jobs:
           --network="host" \
           -v $GITHUB_WORKSPACE:/workspace \
           justb4/jmeter \
-          -n -t /workspace/Demo.jmx \
+          -n -t /workspace/your_test_plan.jmx \
           -R${{ github.event.inputs.slave_ip }} \
           -Dserver.rmi.ssl.disable=true \
           -Duser.properties=/workspace/user.properties
