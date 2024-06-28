@@ -27,7 +27,8 @@ jobs:
     - name: Configure and run JMeter test
       run: |
         sudo chmod -R 777 $JMETER_HOME/bin
-        echo "${{ github.event.inputs.slave_ip }}" | su -c 'tee $JMETER_HOME/bin/slaves.txt'
+        echo "${{ github.event.inputs.slave_ip }}" | sudo tee $JMETER_HOME/bin/slaves.txt
+        sudo chmod 644 $JMETER_HOME/bin/slaves.txt
         jmeter -n -t your_test_plan.jmx -R${{ github.event.inputs.slave_ip }}
 
     - name: Post-test cleanup
