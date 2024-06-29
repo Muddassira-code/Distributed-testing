@@ -33,8 +33,14 @@ jobs:
         sudo systemctl start docker
         sudo systemctl enable docker
 
-    - name: Debug Network
+    - name: Debug Network from runner
       run: |
+        echo "Pinging from runner to ${{ github.event.inputs.slave_ip }}"
+        ping -c 4 ${{ github.event.inputs.slave_ip }}
+
+    - name: Debug Network from Docker container
+      run: |
+        echo "Pinging from Docker container to ${{ github.event.inputs.slave_ip }}"
         sudo docker run --network host alpine ping -c 4 ${{ github.event.inputs.slave_ip }}
 
     - name: Run JMeter Master
