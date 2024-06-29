@@ -15,6 +15,23 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
+    - name: Download JMeter (optional)
+      # Download JMeter if not already present (replace with your desired version)
+      run: |
+        if [ ! -d $GITHUB_WORKSPACE/jmeter ]; then
+          wget -qO- https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.4.1.tgz | tar -xzf - -C $GITHUB_WORKSPACE
+        fi
+
+    # OR
+
+    - name: Check JMeter installation directory (alternative)
+      # Modify this step if JMeter is pre-installed on the runner
+      run: |
+        if [ ! -d /opt/apache-jmeter-5.4.1 ]; then
+          echo "JMeter directory not found. Please check the installation path."
+          exit 1
+        fi
+
     - name: Install Docker (optional)
       # Only necessary if not already installed on the runner
       run: |
@@ -26,13 +43,6 @@ jobs:
           gnupg \
           lsb-release
         # ... (rest of installation steps)
-
-    - name: Check JMeter installation directory
-      run: |
-        if [ ! -d $GITHUB_WORKSPACE/jmeter ]; then
-          echo "JMeter directory not found. Please provide the correct path."
-          exit 1
-        fi
 
     - name: Generate (if not exists) rmi_keystore.jks
       run: |
