@@ -11,34 +11,61 @@ on:
 jobs:
   jmeter-master:
     runs-on: self-hosted
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Set up Docker environment
-      if: runner.os == 'Linux'
+    - name: Install Docker and dependencies
       run: |
-        sudo service docker start
-        sudo chmod 666 /var/run/docker.sock
+        sudo apt-get update
+        sudo apt-get install -y \
+          apt-transport-https \
+          ca-certificates \
+          curl \
+          gnupg \
+          lsb-release
+        sudo rm -f /usr/share/keyrings/docker-archive-keyring.gpg
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --batch -o /usr/share/keyrings/docker-archive-keyring.gpg
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+          $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        sudo apt-get update
+        sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+        sudo systemctl start docker
+        sudo systemctl enable docker
 
-    - name: Create user.properties file
-      run: echo "server.rmi.ssl.disable=true" > $GITHUB_WORKSPACE/user.properties
+    - name: Stop and remove existing Docker containers
+      run: |
+        sudo docker stop $(sudo docker ps -a -q)
+        sudo docker rm $(sudo docker ps -a -q)
 
-    - name: Verify user.properties content
-      run: cat $GITHUB_WORKSPACE/user.properties
+    - name: Create custom user.properties
+      run: |
+        echo "server.rmi.ssl.disable=true" > $GITHUB_WORKSPACE/user.properties
 
-    - name: Configure and run JMeter test
+    - name: Debug Network from runner
+      run: |
+        echo "Pinging from runner to ${{ github.event.inputs.slave_ip }}"
+        ping -c 4 ${{ github.event.inputs.slave_ip }}
+
+    - name: Debug Network from Docker container
+      run: |
+        echo "Pinging from Docker container to ${{ github.event.inputs.slave_ip }}"
+        sudo docker run --network host alpine ping -c 4 ${{ github.event.inputs.slave_ip }}
+
+    - name: Run JMeter Master
       run: |
         echo "${{ github.event.inputs.slave_ip }}" > $GITHUB_WORKSPACE/slaves.txt
-        docker run \
-          --network="host" \
+        sudo docker run \
+          --network host \
           -v $GITHUB_WORKSPACE:/workspace \
+          -v $GITHUB_WORKSPACE/user.properties:/opt/apache-jmeter-5.4.1/bin/user.properties \
           justb4/jmeter \
-          -n -t /workspace/Demo.jmx \
-          -R${{ github.event.inputs.slave_ip }} \
-          -Dserver.rmi.ssl.disable=true \
-          -Duser.properties=/workspace/user.properties
+          -n -t /workspace/Demo.jmx -R${{ github.event.inputs.slave_ip }} -Dserver.rmi.ssl.disable=true -Duser.properties=/workspace/user.properties 
+
+    - name: Inspect JMeter Logs
+      run: |
+        sudo docker run --network host justb4/jmeter tail -n 50 /opt/apache-jmeter-5.4.1/bin/jmeter.log
 
     - name: Upload JTL file
       if: always()
@@ -48,4 +75,5 @@ jobs:
         path: $GITHUB_WORKSPACE/*.jtl
 
     - name: Post-test cleanup
-      run: echo "Test completed. Cleaning up..."
+      run: |
+        echo "Test completed. Cleaning up..."
