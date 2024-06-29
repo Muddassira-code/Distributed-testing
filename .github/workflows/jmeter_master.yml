@@ -60,7 +60,7 @@ jobs:
           --network host \
           -v $GITHUB_WORKSPACE:/workspace \
           -v $GITHUB_WORKSPACE/user.properties:/opt/apache-jmeter-5.4.1/bin/user.properties \
-          justb4/jmeter \
+          justb4/jmeter:latest \
           -n -t /workspace/Demo.jmx -R${{ github.event.inputs.slave_ip }} -Dserver.rmi.ssl.disable=true -Duser.properties=/workspace/user.properties 
 
     - name: Inspect JMeter Logs
