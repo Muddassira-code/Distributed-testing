@@ -16,6 +16,12 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
+    - name: Set up Docker environment
+      if: runner.os == 'Linux'
+      run: |
+        sudo service docker start
+        sudo chmod 666 /var/run/docker.sock
+
     - name: Create user.properties file
       run: echo "server.rmi.ssl.disable=true" > $GITHUB_WORKSPACE/user.properties
 
