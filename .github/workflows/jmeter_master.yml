@@ -18,9 +18,8 @@ jobs:
     - name: Install Docker
       run: |
         sudo yum update -y
-        curl -fsSL https://get.docker.com -o get-docker.sh
-        sudo sh get-docker.sh
-        sudo systemctl start docker
+        sudo amazon-linux-extras install docker -y
+        sudo service docker start
         sudo systemctl enable docker
 
     - name: Debug Network from runner
