@@ -27,11 +27,22 @@ jobs:
           lsb-release
         # ... (rest of installation steps)
 
-    - name: Generate (if not exists) and copy rmi_keystore.jks
+    - name: Check JMeter installation directory
+      run: |
+        if [ ! -d $GITHUB_WORKSPACE/jmeter ]; then
+          echo "JMeter directory not found. Please provide the correct path."
+          exit 1
+        fi
+
+    - name: Generate (if not exists) rmi_keystore.jks
       run: |
         if [ ! -f $GITHUB_WORKSPACE/jmeter/bin/rmi_keystore.jks ]; then
           sh $GITHUB_WORKSPACE/jmeter/bin/create-rmi-keystore
         fi
+
+    - name: Copy rmi_keystore.jks to slave (optional)
+      # Only necessary if automatic key distribution isn't configured
+      run: |
         scp $GITHUB_WORKSPACE/jmeter/bin/rmi_keystore.jks user@${{ github.event.inputs.slave_ip }}:/path/to/jmeter/bin (or equivalent)
 
     - name: Create custom user.properties
