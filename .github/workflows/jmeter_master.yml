@@ -15,25 +15,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Download JMeter (optional)
-      # Download JMeter if not already present (replace with your desired version)
-      run: |
-        if [ ! -d $GITHUB_WORKSPACE/jmeter ]; then
-          wget -qO- https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.4.1.tgz | tar -xzf - -C $GITHUB_WORKSPACE
-        fi
-
-    # OR
-
-    - name: Check JMeter installation directory (alternative)
-      # Modify this step if JMeter is pre-installed on the runner
-      run: |
-        if [ ! -d /opt/apache-jmeter-5.4.1 ]; then
-          echo "JMeter directory not found. Please check the installation path."
-          exit 1
-        fi
-
-    - name: Install Docker (optional)
-      # Only necessary if not already installed on the runner
+    - name: Install Docker
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -42,27 +24,29 @@ jobs:
           curl \
           gnupg \
           lsb-release
-        # ... (rest of installation steps)
-
-    - name: Generate (if not exists) rmi_keystore.jks
-      run: |
-        if [ ! -f $GITHUB_WORKSPACE/jmeter/bin/rmi_keystore.jks ]; then
-          sh $GITHUB_WORKSPACE/jmeter/bin/create-rmi-keystore
-        fi
-
-    - name: Copy rmi_keystore.jks to slave (optional)
-      # Only necessary if automatic key distribution isn't configured
-      run: |
-        scp $GITHUB_WORKSPACE/jmeter/bin/rmi_keystore.jks user@${{ github.event.inputs.slave_ip }}:/path/to/jmeter/bin (or equivalent)
+        sudo rm -f /usr/share/keyrings/docker-archive-keyring.gpg
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --batch -o /usr/share/keyrings/docker-archive-keyring.gpg
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+          $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        sudo apt-get update
+        sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+        sudo systemctl start docker
+        sudo systemctl enable docker
 
     - name: Create custom user.properties
       run: |
-        echo "server.rmi.ssl.disable=true" >> $GITHUB_WORKSPACE/user.properties
+        echo "server.rmi.ssl.disable=true" > $GITHUB_WORKSPACE/user.properties
 
-    - name: Debug Network (optional)
+    - name: Debug Network from runner
       run: |
         echo "Pinging from runner to ${{ github.event.inputs.slave_ip }}"
         ping -c 4 ${{ github.event.inputs.slave_ip }}
+
+    - name: Debug Network from Docker container
+      run: |
+        echo "Pinging from Docker container to ${{ github.event.inputs.slave_ip }}"
+        sudo docker run --network host alpine ping -c 4 ${{ github.event.inputs.slave_ip }}
 
     - name: Run JMeter Master
       run: |
@@ -71,9 +55,12 @@ jobs:
           --network host \
           -v $GITHUB_WORKSPACE:/workspace \
           -v $GITHUB_WORKSPACE/user.properties:/opt/apache-jmeter-5.4.1/bin/user.properties \
-          -v $GITHUB_WORKSPACE/jmeter/bin/rmi_keystore.jks:/opt/apache-jmeter-5.4.1/bin/rmi_keystore.jks \
           justb4/jmeter:latest \
-          -n -t /workspace/Demo.jmx -Duser.properties=/opt/apache-jmeter-5.4.1/bin/user.properties -R${{ github.event.inputs.slave_ip }}
+          -n -t /workspace/Demo.jmx -R${{ github.event.inputs.slave_ip }} -Duser.properties=/opt/apache-jmeter-5.4.1/bin/user.properties
+
+    - name: Inspect JMeter Logs
+      run: |
+        sudo docker run --network host justb4/jmeter:latest tail -n 50 /opt/apache-jmeter-5.4.1/bin/jmeter.log
 
     - name: Upload JTL file
       if: always()
