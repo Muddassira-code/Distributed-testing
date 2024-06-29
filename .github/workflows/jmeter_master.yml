@@ -56,7 +56,7 @@ jobs:
           -v $GITHUB_WORKSPACE:/workspace \
           -v $GITHUB_WORKSPACE/user.properties:/opt/apache-jmeter-5.4.1/bin/user.properties \
           justb4/jmeter:latest \
-          -n -t /workspace/Demo.jmx -R${{ github.event.inputs.slave_ip }}
+          -n -t /workspace/Demo.jmx -Duser.properties=/opt/apache-jmeter-5.4.1/bin/user.properties -R${{ github.event.inputs.slave_ip }}
 
     - name: Upload JTL file
       if: always()
