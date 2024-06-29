@@ -1,0 +1,24 @@
+version: '3'
+services:
+  jmeter-slave:
+    image: justb4/jmeter:latest
+    ports:
+      - 1099:1099  # RMI port
+      - 60000:60000  # JMeter server port
+    networks:
+      - jmeter-network
+
+  jmeter-master:
+    image: justb4/jmeter:latest
+    volumes:
+      - .:/workspace
+    depends_on:
+      - jmeter-slave
+    command: >
+      -n -t /workspace/Demo.jmx -Rjmeter-slave
+    networks:
+      - jmeter-network
+
+networks:
+  jmeter-network:
+    driver: bridge
