@@ -39,9 +39,10 @@ jobs:
         sudo docker stop $(sudo docker ps -a -q)
         sudo docker rm $(sudo docker ps -a -q)
 
-    - name: Create custom user.properties
+    - name: Create custom user.properties with RMI configuration
       run: |
         echo "server.rmi.ssl.disable=true" > $GITHUB_WORKSPACE/user.properties
+        echo "server.rmi.localport=1099" >> $GITHUB_WORKSPACE/user.properties
 
     - name: Debug Network from runner
       run: |
@@ -61,7 +62,7 @@ jobs:
           -v $GITHUB_WORKSPACE:/workspace \
           -v $GITHUB_WORKSPACE/user.properties:/opt/apache-jmeter-5.4.1/bin/user.properties \
           justb4/jmeter:latest \
-          -n -t /workspace/Demo.jmx -R${{ github.event.inputs.slave_ip }}  -Duser.properties=/workspace/user.properties -Dserver.rmi.ssl.disable=true
+          -n -t /workspace/Demo.jmx -R${{ github.event.inputs.slave_ip }} -Duser.properties=/workspace/user.properties -Dserver.rmi.ssl.disable=true -Dserver.rmi.localport=1099
 
     - name: Inspect JMeter Logs
       run: |
