@@ -15,21 +15,32 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Set up JMeter
+    - name: Install Docker
       run: |
         sudo apt-get update
-        sudo apt-get install -y openjdk-11-jdk
-        wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.4.1.tgz
-        tar -xvzf apache-jmeter-5.4.1.tgz
-        export JMETER_HOME=$PWD/apache-jmeter-5.4.1
-        export PATH=$JMETER_HOME/bin:$PATH
+        sudo apt-get install -y docker.io
+        sudo systemctl start docker
+        sudo systemctl enable docker
 
-    - name: Configure and run JMeter test
+    - name: Debug Network
       run: |
-        sudo chmod -R 777 $JMETER_HOME/bin
-        echo "${{ github.event.inputs.slave_ip }}" | sudo tee $JMETER_HOME/bin/slaves.txt
-        sudo chmod 644 $JMETER_HOME/bin/slaves.txt
-        jmeter -n -t Demo.jmx -R${{ github.event.inputs.slave_ip }}
+        sudo docker run --network host alpine ping -c 4 ${{ github.event.inputs.slave_ip }}
+
+    - name: Run JMeter Master
+      run: |
+        echo "${{ github.event.inputs.slave_ip }}" > $GITHUB_WORKSPACE/slaves.txt
+        sudo docker run \
+          --network host \
+          -v $GITHUB_WORKSPACE:/workspace \
+          justb4/jmeter:latest \
+          -n -t /workspace/Demo.jmx -R${{ github.event.inputs.slave_ip }}
+
+    - name: Upload JTL file
+      if: always()
+      uses: actions/upload-artifact@v2
+      with:
+        name: jmeter-results
+        path: $GITHUB_WORKSPACE/*.jtl
 
     - name: Post-test cleanup
       run: |
